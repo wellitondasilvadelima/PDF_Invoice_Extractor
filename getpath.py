@@ -23,4 +23,4 @@ def check_path():
     if not os.path.exists(path_error):
         os.makedirs(path_error)
         
-    return path_input, path_data, okay
+    return okay, path_input, path_data, path_error, path_output

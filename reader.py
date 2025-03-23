@@ -1,37 +1,25 @@
 import pdfplumber
 import re
-import item
 from datetime import datetime
+from regex_patterns import RegexPatterns
+from decimal import Decimal
 
-def pdf_reader(invoice_name,listitems):
-    regex_date = r"\d{2}\/\d{2}\/\d{4}|\d{1}\/\d{1}\/\d{4}|\d{2}\/\d{1}\/\d{4}|\d{1}\/\d{2}\/\d{4}"
-    regex_duedate = r"DUE DATE:\s\d{2}\/\d{2}\/\d{4}|DUE DATE:\s\d{1}\/\d{1}\/\d{4}|DUE DATE:\s\d{2}\/\d{1}\/\d{4}|DUE DATE:\s\d{1}\/\d{2}\/\d{4}"
-    regex_num_invoice = r"\#\d*"
-    regex_ordernumber = r"ORDER NUMBER:\s\d+"
-
-    regex_suppliercompany = r"INVOICE\s.[^0-9]+"
-    regex_suppliercompanyadress = r"\d+\s.*?,\s.*\w{2}\s.\d+\n"
-    regex_phonecompany = r"Phone:\s\(\d+\)\s\d+-\d+|Phone:\s\(\d+\)\s\d\s\d+-\d+|Phone:\s\(\d+\)\d+-\d+"
-
-    regex_costumername= r"BILL TO:\s.[A-Za-z\s&.]+"
-    regex_costumeraddress = r"\d+\s.[A-Za-z&.,\s]+[0-9]+\s\("
-    regex_costumerphone = r"\d{1}\s\(\d+\)\s\d+\-\d+"
+def pdf_reader(invoice_name,data_log):
 
     with pdfplumber.open(f"input/{invoice_name}") as pdf:
         for page in pdf.pages:
             text_extract = page.extract_text()
             tables = page.extract_tables()
-    num_invoice = ""
     try:
-        num_invoice = re.search(regex_num_invoice, text_extract).group()[1:]
-        date = re.search(regex_date, text_extract).group()
-        duedate = re.search(regex_duedate, text_extract).group()[10:]
-        ordernumber = re.search(regex_ordernumber, text_extract).group()[14:]
-        suppliercompanyadress = re.search(regex_suppliercompanyadress, text_extract).group()[:-1]
-        suppliercompany = re.search(regex_suppliercompany, text_extract).group()[8:-1].replace("\n", " ")
-        phonecompany = re.search(regex_phonecompany, text_extract).group()[7:]
-        costumerphone = re.search(regex_costumerphone, text_extract).group()[2:]
+        invoice_number = re.search(RegexPatterns.NUM_INVOICE, text_extract).group()[1:]
+        issue_date = re.search(RegexPatterns.ISSUE_DATE, text_extract).group()
+        due_date = re.search(RegexPatterns.DUE_DATE, text_extract).group()[10:]
         po_number = tables[0][1][1]
+        ordernumber = re.search(RegexPatterns.ORDER_NUMBER, text_extract).group()[14:]
+        suppliercompanyadress = re.search(RegexPatterns.SUPPLIER_COMPANY_ADRESS, text_extract).group()[:-1]
+        suppliercompany = re.search(RegexPatterns.SUPPLIER_COMPANY, text_extract).group()[8:-1].replace("\n", " ")
+        phonecompany = re.search(RegexPatterns.SUPPLIER_COMPANY_PHONE, text_extract).group()[7:]
+        costumerphone = re.search(RegexPatterns.COSTUMER_PHONE, text_extract).group()[2:]
         terms = tables[0][1][5]
 
         # Extrair palavras com suas posições
@@ -50,35 +38,58 @@ def pdf_reader(invoice_name,listitems):
         # Reconstruir os textos separados
         bill_to_text = " ".join(bill_to)
 
-        costumername = re.search(regex_costumername, bill_to_text).group()[9:]
-        costumeraddress = re.search(regex_costumeraddress, bill_to_text).group()[:-2]
+        customer_name = re.search(RegexPatterns.COSTUMER_NAME, bill_to_text).group()[9:]
+        customer_address = re.search(RegexPatterns.COSTUMER_ADDRESS, bill_to_text).group()[:-2]
 
         listproducts = []
         for i in range(1,len(tables[1])-1):
-            if(tables[1][i][0]!="" and tables[1][i][0]!=None):
-                items =  (item.product_info(
-                                quantity = tables[1][i][0],
-                                products = tables[1][i][1],
-                                unitprice = tables[1][i][2],
-                                total = tables[1][i][3],
-                                )
-                        )
-                listproducts.append(items)
+            if(tables[1][i][0]!="" and tables[1][i][0]!=None):             
+                quantity = int(tables[1][i][0])
+                description = tables[1][i][1]
+                unitprice = Decimal(tables[1][i][2])
+                total = Decimal(tables[1][i][3])
 
-        subtotal = tables[1][11][3]
-        salestax = tables[1][12][3]
-        shipping_handling = tables[1][13][3]
-        duetotal = tables[1][14][3]
-        '''
-        "-------- Lógica de salvar no banco de dados... -------------"'
-        '''
+                listproducts.append({"quantity":quantity,"description":description,"unitprice":unitprice,"total":total})
+
+        subtotal = Decimal(tables[1][11][3])
+        salestax = Decimal(tables[1][12][3])
+        shipping_handling = Decimal(tables[1][13][3])
+        total_due = Decimal(tables[1][14][3])
+
+        #-------- Lógica de salvar no banco de dados... -------------
+        
+        payment_date="2025-01-01"
+        payment_amount=Decimal("100")
+        payment_status="ok"
+
+        #formata data
+        issue_date = datetime.strptime(issue_date, "%m/%d/%Y").strftime("%Y-%m-%d")
+        due_date = datetime.strptime(due_date, "%m/%d/%Y").strftime("%Y-%m-%d")
+        #-----------------------------------------------------------------------
         date_now =  datetime.now().strftime("%d/%m/%Y")
         hour_now =  datetime.now().strftime("%H:%M:%S")
-        listitems.append([date_now,hour_now,invoice_name,num_invoice,"COMPLETED","OK"])
-        return True
+        data_log.append([date_now,hour_now,invoice_name,invoice_number,"COMPLETED","OK"])
+        data = {
+                "invoice_number" : invoice_number,
+                "issue_date" : issue_date,
+                "due_date" : due_date,
+                "customer_name" : customer_name,
+                "customer_address" : customer_address,
+                "po_number" : po_number,
+                "subtotal" : subtotal,
+                "salestax" : salestax,
+                "total_due" : total_due, 
+                "payment_status" : payment_status,
+                "payment_date" : payment_date, 
+                "payment_amount" : payment_amount,
+                "products": listproducts}
+
+        return True, data
+    
     except Exception as e:
         date_now =  datetime.now().strftime("%d/%m/%Y")
         hour_now =  datetime.now().strftime("%H:%M:%S")
-        items = [date_now,hour_now,invoice_name,num_invoice,"Exception","Invoice outside the specified standard: " + str(e)]
-        listitems.append(items)
-        return False
+        invoice_number = invoice_number if invoice_number != "" else ""
+        items_log = [date_now,hour_now,invoice_name,invoice_number,"Exception","Invoice outside the specified standard: " + str(e)]
+        data_log.append(items_log)
+        return False, {}
