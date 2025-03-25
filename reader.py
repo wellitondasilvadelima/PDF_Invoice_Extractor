@@ -19,23 +19,23 @@ def pdf_reader(invoice_name,data_log):
         suppliercompanyadress = re.search(RegexPatterns.SUPPLIER_COMPANY_ADRESS, text_extract).group()[:-1]
         suppliercompany = re.search(RegexPatterns.SUPPLIER_COMPANY, text_extract).group()[8:-1].replace("\n", " ")
         phonecompany = re.search(RegexPatterns.SUPPLIER_COMPANY_PHONE, text_extract).group()[7:]
-        costumerphone = re.search(RegexPatterns.COSTUMER_PHONE, text_extract).group()[2:]
+        customerphone = re.search(RegexPatterns.COSTUMER_PHONE, text_extract).group()[2:]
         terms = tables[0][1][5]
 
-        # Extrair palavras com suas posições
+        # Extract words with their positions
         words = page.extract_words()
-        # Separar palavras manualmente com base na posição X
+        # Manually split words based on X position
         bill_to = []
-        middle_x = page.width / 2  # Definir um ponto de separação no meio da página
+        middle_x = page.width / 2  # Set a separation point in the middle of the page
 
         for word in words:
-            x0 = word['x0']  # Posição X inicial do texto
+            x0 = word['x0']  # Initial X position of text
             text = word['text']
 
-            if x0 < middle_x:  # Se estiver na parte esquerda da página, pertence a BILL TO
+            if x0 < middle_x:  # If it's on the left side of the page, it belongs to BILL TO
                 bill_to.append(text)
 
-        # Reconstruir os textos separados
+        # Reconstruct the separated texts
         bill_to_text = " ".join(bill_to)
 
         customer_name = re.search(RegexPatterns.COSTUMER_NAME, bill_to_text).group()[9:]
@@ -55,14 +55,11 @@ def pdf_reader(invoice_name,data_log):
         salestax = Decimal(tables[1][12][3])
         shipping_handling = Decimal(tables[1][13][3])
         total_due = Decimal(tables[1][14][3])
-
-        #-------- Lógica de salvar no banco de dados... -------------
         
-        payment_date="2025-01-01"
-        payment_amount=Decimal("100")
-        payment_status="ok"
+        payment_date= due_date
+        payment_amount= total_due
 
-        #formata data
+        # format date
         issue_date = datetime.strptime(issue_date, "%m/%d/%Y").strftime("%Y-%m-%d")
         due_date = datetime.strptime(due_date, "%m/%d/%Y").strftime("%Y-%m-%d")
         #-----------------------------------------------------------------------
@@ -75,13 +72,19 @@ def pdf_reader(invoice_name,data_log):
                 "due_date" : due_date,
                 "customer_name" : customer_name,
                 "customer_address" : customer_address,
+                "customerphone":customerphone,
+                "suppliercompany":suppliercompany,
+                "suppliercompanyadress":suppliercompanyadress,
+                "phonecompany":phonecompany,
                 "po_number" : po_number,
+                "ordernumber":ordernumber,
                 "subtotal" : subtotal,
                 "salestax" : salestax,
-                "total_due" : total_due, 
-                "payment_status" : payment_status,
+                "total_due" : total_due,
+                "payment_shipping_handling":shipping_handling,
                 "payment_date" : payment_date, 
                 "payment_amount" : payment_amount,
+                "payment_terms":terms,
                 "products": listproducts}
 
         return True, data

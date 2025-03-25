@@ -5,14 +5,7 @@ from reader import pdf_reader
 from movefiles import move_allfiles
 from database_commit import savedata_Invoice_Items,savedata_Invoices,savedata_Payments
 
-#from openpyxl import load_workbook
-
-# path_input   =  './input'
-# path_data    =  './data'
-# path_error   =  './dataerror'
-# path_output  =  './output'
-
-def Data_Log(cols,rows,path_output):
+def Data_Log(cols, rows, path_output):
     file_log = path_output+"/logs.xlsx"
 
     new_data = pd.DataFrame(columns=cols,data=rows)
@@ -26,14 +19,15 @@ def Data_Log(cols,rows,path_output):
             new_data.to_excel(writer, index=False, header=False, startrow=len(df_exists) + 1)
         print("Novos dados adicionados com sucesso!")
 
-def process_reader(path_input, path_data,path_error,path_output):
+def process_reader(path_input, path_data, path_error, path_output, progress, mainwindow):
     # -------|    Variable declaration   |-------
     msg_return = ""
-    move_okay  = False
+    save  = False
     # -------| END Variable declaration |-------
 
     list_invoice = os.listdir(path_input) # Get the files contained in the directory
-
+    tam = len(list_invoice)
+    i = 1
     if (list_invoice != []):
 
         cols = ["Date_process","Hour_process","File_Name","invoice_number","Status","Messege"]
@@ -43,27 +37,52 @@ def process_reader(path_input, path_data,path_error,path_output):
                 save, data = pdf_reader(invoice_name,rows) 
 
                 if (save == True):
-                    print(invoice_name)
-                    savedata_Invoices(data["invoice_number"],data["issue_date"],data["due_date"],data["customer_name"],data["customer_address"],data["po_number"],data["subtotal"],data["salestax"],data["total_due"], data["payment_status"])
+
+                    savedata_Invoices(data["invoice_number"],
+                                      data["issue_date"],
+                                      data["due_date"],
+                                      data["customer_name"],
+                                      data["customer_address"],
+                                      data["customerphone"],
+                                      data["suppliercompany"],
+                                      data["suppliercompanyadress"],
+                                      data["phonecompany"],
+                                      data["ordernumber"],
+                                      data["po_number"],
+                                      data["subtotal"],
+                                      data["salestax"],
+                                      data["total_due"], 
+                                      data["payment_terms"])
             
-                    savedata_Payments(data["invoice_number"],data["payment_date"], data["payment_amount"],data["payment_status"])
+                    savedata_Payments(data["invoice_number"],
+                                      data["payment_date"],
+                                      data["payment_terms"],
+                                      data["payment_amount"],
+                                      data["payment_shipping_handling"])
+
 
                     for product in data["products"]:
-                        savedata_Invoice_Items(data["invoice_number"],product["description"],product["quantity"],product["unitprice"],product["total"])
+                        savedata_Invoice_Items(data["invoice_number"],
+                                               data["ordernumber"],
+                                               product["description"],
+                                               product["quantity"],
+                                               product["unitprice"],
+                                               product["total"])
 
-                    move_allfiles(path_input,path_data, invoice_name)
+                    move_allfiles(path_input,path_data,invoice_name)
+                    progress.set(i / tam)
+                    mainwindow.update()  # Updates the interface
+                    time.sleep(0.05)  # Pause to simulate progress
                 else:
                     move_allfiles(path_input,path_error, invoice_name)
             else:
                move_allfiles(path_input,path_error, invoice_name)
                rows.append(" "," ",invoice_name," ","Exeception","It's not a PDF File.")
-
+            i=i+1
         # Checks to create a message informing the user
-        
         if(rows != []):
            Data_Log(cols,rows,path_output)
-        else:
-            msg_return = ("Output file LOG CANNOT be generated")
+           msg_return = ("Processo finalizado!")
     else:
         msg_return = "The input folder is empty!"
     
