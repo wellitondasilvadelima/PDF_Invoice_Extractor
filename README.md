@@ -65,13 +65,13 @@ pip install -r requirements.txt
 - Consulte os logs do processo no arquivo Excel gerado em output/.
 
 ## Estrutura de Pastas
-
+```
 |-- input/          # Invoices a serem processadas
 |-- data/           # Invoices processadas corretamente
 |-- dataerror/      # Invoices com erro
 |-- output/         # Arquivo Excel de log do processo
 |-- main.py         # Script principal
-
+```
 # Tecnologias Utilizadas
 
 - **Python 3.7+**
