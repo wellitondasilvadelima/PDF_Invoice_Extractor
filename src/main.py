@@ -15,7 +15,6 @@ from getpath import check_path
 from database_create import create_database,create_tables
 from test_dbconnection import db_connection
 import customtkinter as ctk
-import re
 
 def clear():
     progress.set(0)

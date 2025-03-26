@@ -1,4 +1,3 @@
-import pymysql
 from database_config import DB_CONFIG
 from database_connect import connect
 
